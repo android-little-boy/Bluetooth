@@ -4,7 +4,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.lifecycle.ViewModelProviders;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -18,25 +17,23 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.Toast;
-
-import com.huangwenjie.bluetooth.callback.DiscoveryCallback;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-    private BluetoothHelper bluetoothHelper;
     private List<BluetoothDevice> bluetoothDevices = new ArrayList<>();
     private static final String TAG = "MainActivity";
     private MyAdapter myAdapter;
     private MyViewModel myViewModel;
+    public static MainActivity mainActivity = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        myViewModel = new ViewModelProvider(this).get(MyViewModel.class);
+        mainActivity = this;
+        myViewModel = new ViewModelProvider(MainActivity.mainActivity).get(MyViewModel.class);
         myViewModel.init();
         myViewModel.bluetoothDevice.observe(this, new Observer<BluetoothDevice>() {
             @Override
@@ -81,6 +78,15 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == BluetoothHelper.DEVICE_VISIBLE_REQUEST_CODE) {
             Log.d("TAG", "onActivityResult: " + resultCode + " " + data);
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        while (!myViewModel.isBluetoothEnable()){
+        }
+        myAdapter.isConnecting = false;
+        myViewModel.startAccept();
     }
 
     @Override

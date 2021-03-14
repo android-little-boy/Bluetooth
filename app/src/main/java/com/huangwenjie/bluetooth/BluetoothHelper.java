@@ -9,38 +9,61 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.huangwenjie.bluetooth.callback.ConnectCallback;
 import com.huangwenjie.bluetooth.callback.DiscoveryCallback;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Set;
 import java.util.UUID;
 
 public class BluetoothHelper {
     private BluetoothAdapter mBluetoothAdapter;
-    private Context context;
     private DiscoveryCallback discoveryCallback;
     private ConnectCallback connectCallback;
+    private static final int FLAG_MSG = 0;  //消息标记
+    private static final int FLAG_FILE = 1; //文件标记
+    public static final String FLAG_CLOSE = "1111close";//通道关闭消息标记
 
     public static int DEVICE_VISIBLE_REQUEST_CODE = 1111;
+
+    private String filePath;
 
     public static UUID MY_UUID = UUID.fromString("5be6b179-fb44-4ca8-b6bd-b87a85e6008e");
     private static final String TAG = "BluetoothHelper";
 
-    public BluetoothHelper(Context context, BluetoothAdapter mBluetoothAdapter) {
-        this.mBluetoothAdapter = mBluetoothAdapter;
-        this.context = context;
+    private BluetoothHelper() {
     }
 
-    public void init() {
+    static class BluetoothHelperProvider {
+        private static final BluetoothHelper bluetoothHelper = new BluetoothHelper();
+
+        public static BluetoothHelper get() {
+            return bluetoothHelper;
+        }
+    }
+
+    public void setFilePath(String filePath) {
+        this.filePath = filePath;
+    }
+
+    public void init(BluetoothAdapter mBluetoothAdapter) {
+        this.mBluetoothAdapter = mBluetoothAdapter;
         // 没有开始蓝牙
-        if (!mBluetoothAdapter.isEnabled()) {
-            mBluetoothAdapter.enable();
+        if (!this.mBluetoothAdapter.isEnabled()) {
+            this.mBluetoothAdapter.enable();
         }
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
-        context.registerReceiver(mReceiver, filter);
+        MyApplication.getAppContext().registerReceiver(mReceiver, filter);
     }
 
     public void setConnectCallback(ConnectCallback callback) {
@@ -94,7 +117,7 @@ public class BluetoothHelper {
      *
      * @param times 可见的时间，目前测试Android 10 无效，默认都是120秒
      */
-    public static void setDeviceVisible(Activity activity,int times) {
+    public static void setDeviceVisible(Activity activity, int times) {
         Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
         discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, times);
         activity.startActivityForResult(discoverableIntent, DEVICE_VISIBLE_REQUEST_CODE);
@@ -119,9 +142,13 @@ public class BluetoothHelper {
         }
     };
 
+    public boolean isEnable() {
+        return mBluetoothAdapter.isEnabled();
+    }
+
     // 在 onDestroy 中 unRegister
     public void unInit() {
-        context.unregisterReceiver(mReceiver);
+        MyApplication.getAppContext().unregisterReceiver(mReceiver);
     }
 
     private AcceptThread acceptThread;
@@ -206,6 +233,13 @@ public class BluetoothHelper {
             connectThread.interrupt();
             connectThread = null;
         }
+//        if (bluetoothSocket!=null){
+//            try {
+//                bluetoothSocket.close();
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        }
     }
 
     private class ConnectThread extends Thread {
@@ -229,7 +263,7 @@ public class BluetoothHelper {
                 mSocket.connect();
             } catch (IOException connectException) {
                 Log.d(TAG, "run: 失败" + connectException.getMessage());
-                if (connectCallback!=null){
+                if (connectCallback != null) {
                     connectCallback.onFailConnect();
                 }
                 try {
@@ -246,6 +280,8 @@ public class BluetoothHelper {
         public void cancel() {
             try {
                 mSocket.close();
+                isRead = false;
+                Log.d(TAG, "cancel: ");
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -253,12 +289,100 @@ public class BluetoothHelper {
     }
 
     private BluetoothSocket bluetoothSocket;
+    private DataOutputStream dataOutputStream;
+    private boolean isRead;
 
     private void manageConnectedSocket(BluetoothSocket mSocket) {
         this.bluetoothSocket = mSocket;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    dataOutputStream = new DataOutputStream(bluetoothSocket.getOutputStream());
+                    DataInputStream in = new DataInputStream(bluetoothSocket.getInputStream());
+                    isRead = true;
+                    while (isRead) { //循环读取
+                        switch (in.readInt()) {
+                            case FLAG_MSG: //读取短消息
+                                String msg = in.readUTF();
+                                if (msg.equals(FLAG_CLOSE)){
+                                    if (connectCallback!=null){
+                                        connectCallback.onDisconnected(bluetoothSocket.getRemoteDevice());
+                                    }
+                                    isRead = false;
+                                }
+                                //TODO 回调出去
+                                break;
+                            case FLAG_FILE: //读取文件
+                                File file = new File(filePath);
+                                if (!file.exists()) {
+                                    file.mkdirs();
+                                }
+                                String fileName = in.readUTF(); //文件名
+                                long fileLen = in.readLong(); //文件长度
+                                // 读取文件内容
+                                long len = 0;
+                                int r;
+                                byte[] b = new byte[4 * 1024];
+                                FileOutputStream out = new FileOutputStream(filePath + fileName);
+                                while ((r = in.read(b)) != -1) {
+                                    out.write(b, 0, r);
+                                    len += r;
+                                    if (len >= fileLen)
+                                        break;
+                                }
+                                break;
+                        }
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
         if (connectCallback != null) {
             connectCallback.onConnected(mSocket.getRemoteDevice());
         }
+    }
+
+    private boolean isSending;
+
+    public void write(String msg) {
+        if (isSending || TextUtils.isEmpty(msg))
+            return;
+        isSending = true;
+        try {
+            dataOutputStream.writeInt(FLAG_MSG);
+            dataOutputStream.writeUTF(msg);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        isSending = false;
+    }
+
+    public void sendFile(final String filePath) {
+        if (isSending || TextUtils.isEmpty(filePath))
+            return;
+        isSending = true;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    FileInputStream in = new FileInputStream(filePath);
+                    File file = new File(filePath);
+                    dataOutputStream.writeInt(FLAG_FILE); //文件标记
+                    dataOutputStream.writeUTF(file.getName()); //文件名
+                    dataOutputStream.writeLong(file.length()); //文件长度
+                    int r;
+                    byte[] b = new byte[4 * 1024];
+                    while ((r = in.read(b)) != -1) {
+                        dataOutputStream.write(b, 0, r);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                isSending = false;
+            }
+        }).start();
     }
 
 
