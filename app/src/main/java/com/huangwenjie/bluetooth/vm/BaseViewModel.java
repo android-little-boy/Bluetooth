@@ -1,4 +1,5 @@
-package com.huangwenjie.bluetooth;
+package com.huangwenjie.bluetooth.vm;
+
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -7,33 +8,34 @@ import android.util.Log;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
+import com.huangwenjie.bluetooth.BluetoothHelper;
 import com.huangwenjie.bluetooth.callback.ConnectCallback;
-import com.huangwenjie.bluetooth.callback.DiscoveryCallback;
 
-public class MyViewModel extends ViewModel {
-    private BluetoothHelper bluetoothHelper;
-    private static final String TAG = "MyViewModel";
-    MutableLiveData<BluetoothDevice> connectedDevice;
-    MutableLiveData<BluetoothDevice> bluetoothDevice;
-    MutableLiveData<BluetoothDevice> disconnectedDevice;
+public class BaseViewModel extends ViewModel {
+    protected BluetoothHelper bluetoothHelper;
+    private static final String TAG = "BaseViewModel";
+    public MutableLiveData<BluetoothDevice> connectedDevice;
+    public MutableLiveData<BluetoothDevice> bluetoothDevice;
+    public MutableLiveData<BluetoothDevice> disconnectedDevice;
+    protected  BluetoothAdapter mBluetoothAdapter;
 
-    public MyViewModel() {
+    public BaseViewModel() {
         bluetoothDevice = new MutableLiveData<>();
         connectedDevice = new MutableLiveData<>();
         disconnectedDevice = new MutableLiveData<>();
-    }
-
-    public void init() {
-        BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (mBluetoothAdapter == null) {
             Log.d(TAG, "init:你的设备不支持蓝牙 ");
         } else {
             bluetoothHelper = BluetoothHelper.BluetoothHelperProvider.get();
         }
-        bluetoothHelper.init(mBluetoothAdapter);
+    }
+
+    public void setConnectCallback() {
         bluetoothHelper.setConnectCallback(new ConnectCallback() {
             @Override
             public void onConnected(BluetoothDevice bluetoothDevice) {
+                Log.d(TAG, "onConnected: ");
                 connectedDevice.postValue(bluetoothDevice);
             }
 
@@ -44,44 +46,38 @@ public class MyViewModel extends ViewModel {
 
             @Override
             public void onDisconnected(BluetoothDevice bluetoothDevice) {
+                Log.d(TAG, "onDisconnected: ");
                 disconnectedDevice.postValue(bluetoothDevice);
             }
         });
-
     }
-    public boolean isBluetoothEnable(){
+
+    public boolean isBluetoothEnable() {
         return bluetoothHelper.isEnable();
     }
-    public void startAccept(){
+
+    public void startAccept() {
         bluetoothHelper.startAccept();
     }
-    public void stopConnect(){
+
+    public void stopConnect() {
         bluetoothHelper.stopConnect();
     }
-    public void stopAccept(){
+
+    public void stopAccept() {
         bluetoothHelper.stopAccept();
     }
-    public void write(String msg){
+
+    public void write(String msg) {
         bluetoothHelper.write(msg);
     }
 
     public void startDiscovery() {
-        bluetoothHelper.startDiscovery(new DiscoveryCallback() {
-            @Override
-            public void onNewDeviceHasFounded(BluetoothDevice bluetoothDevice) {
-                MyViewModel.this.bluetoothDevice.setValue(bluetoothDevice);
-            }
-        });
+        bluetoothHelper.startDiscovery(bluetoothDevice -> BaseViewModel.this.bluetoothDevice.setValue(bluetoothDevice));
     }
 
     public void startConnect(BluetoothDevice device) {
         bluetoothHelper.startConnect(device);
-    }
-
-    @Override
-    protected void onCleared() {
-        super.onCleared();
-        bluetoothHelper.unInit();
     }
 
 }

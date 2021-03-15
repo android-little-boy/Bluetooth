@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.BlockingDeque;
 
 public class BluetoothHelper {
     private BluetoothAdapter mBluetoothAdapter;
@@ -44,7 +45,7 @@ public class BluetoothHelper {
     private BluetoothHelper() {
     }
 
-    static class BluetoothHelperProvider {
+    public static class BluetoothHelperProvider {
         private static final BluetoothHelper bluetoothHelper = new BluetoothHelper();
 
         public static BluetoothHelper get() {
@@ -76,7 +77,6 @@ public class BluetoothHelper {
      * @return 已配对的蓝牙设备
      */
     public Set<BluetoothDevice> getPairedDevice() {
-        Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
 //        List<MyBluetoothDevice> pairedBluetoothDevices = new ArrayList<>();
 //        if (pairedDevices.size() > 0) {
 //            for (BluetoothDevice device : pairedDevices) {
@@ -86,7 +86,7 @@ public class BluetoothHelper {
 //                pairedBluetoothDevices.add(pairedBluetoothDevice);
 //            }
 //        }
-        return pairedDevices;
+        return mBluetoothAdapter.getBondedDevices();
     }
 
     /**
@@ -136,7 +136,7 @@ public class BluetoothHelper {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 // 将名字和地址放入要显示的适配器中
                 if (discoveryCallback != null) {
-                    discoveryCallback.onNewDeviceHasFounded(device);
+                        discoveryCallback.onNewDeviceHasFounded(device);
                 }
             }
         }
@@ -154,6 +154,7 @@ public class BluetoothHelper {
     private AcceptThread acceptThread;
 
     public void startAccept() {
+        Log.d(TAG, "startAccept: ");
         if (acceptThread != null) {
             acceptThread.cancel();
             acceptThread.interrupt();
@@ -184,6 +185,7 @@ public class BluetoothHelper {
 
         public void run() {
             BluetoothSocket socket = null;
+            Log.d(TAG, "run: accept 1");
             while (true) {
                 try {
                     socket = mServerSocket.accept();
@@ -194,6 +196,7 @@ public class BluetoothHelper {
                 if (socket != null) {
                     // 自定义方法
                     manageConnectedSocket(socket);
+                    Log.d(TAG, "run: accept 2");
                     try {
                         mServerSocket.close();
                     } catch (IOException e) {
@@ -260,7 +263,9 @@ public class BluetoothHelper {
             // 关闭发现设备
             mBluetoothAdapter.cancelDiscovery();
             try {
+                Log.d(TAG, "run: 1");
                 mSocket.connect();
+                Log.d(TAG, "run: 2");
             } catch (IOException connectException) {
                 Log.d(TAG, "run: 失败" + connectException.getMessage());
                 if (connectCallback != null) {
@@ -297,6 +302,7 @@ public class BluetoothHelper {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                Log.d(TAG, "run: manageConnectedSocket ");
                 try {
                     dataOutputStream = new DataOutputStream(bluetoothSocket.getOutputStream());
                     DataInputStream in = new DataInputStream(bluetoothSocket.getInputStream());
@@ -305,11 +311,12 @@ public class BluetoothHelper {
                         switch (in.readInt()) {
                             case FLAG_MSG: //读取短消息
                                 String msg = in.readUTF();
-                                if (msg.equals(FLAG_CLOSE)){
-                                    if (connectCallback!=null){
+                                if (msg.equals(FLAG_CLOSE)) {
+                                    if (connectCallback != null) {
                                         connectCallback.onDisconnected(bluetoothSocket.getRemoteDevice());
                                     }
                                     isRead = false;
+                                    Log.d(TAG, "run: reed");
                                 }
                                 //TODO 回调出去
                                 break;
@@ -340,6 +347,7 @@ public class BluetoothHelper {
             }
         }).start();
         if (connectCallback != null) {
+            Log.d(TAG, "connectCallback: ");
             connectCallback.onConnected(mSocket.getRemoteDevice());
         }
     }

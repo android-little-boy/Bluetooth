@@ -18,6 +18,8 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
+import com.huangwenjie.bluetooth.vm.MyViewModel;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,15 +28,14 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private MyAdapter myAdapter;
     private MyViewModel myViewModel;
-    public static MainActivity mainActivity = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mainActivity = this;
-        myViewModel = new ViewModelProvider(MainActivity.mainActivity).get(MyViewModel.class);
+        myViewModel = new ViewModelProvider(this).get(MyViewModel.class);
         myViewModel.init();
+        BluetoothHelper.setDeviceVisible(this,120);
         myViewModel.bluetoothDevice.observe(this, new Observer<BluetoothDevice>() {
             @Override
             public void onChanged(BluetoothDevice bluetoothDevice) {
@@ -45,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
         myViewModel.connectedDevice.observe(this, new Observer<BluetoothDevice>() {
             @Override
             public void onChanged(BluetoothDevice bluetoothDevice) {
+                Log.d(TAG, "onChanged: ");
                 if (bluetoothDevice!=null){
                     Intent intent = new Intent(MainActivity.this,ChatActivity.class);
                     startActivity(intent);
@@ -59,7 +61,6 @@ public class MainActivity extends AppCompatActivity {
         myAdapter = new MyAdapter(bluetoothDevices, myViewModel, this);
         recyclerView.setLayoutManager(linearLayoutManager);
         recyclerView.setAdapter(myAdapter);
-//        BluetoothHelper.setDeviceVisible(this,120);
         registerReceiver(mReceiver, makeFilter());
         Button button = findViewById(R.id.find);
         button.setOnClickListener(new View.OnClickListener() {
@@ -85,7 +86,9 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         while (!myViewModel.isBluetoothEnable()){
         }
+        Log.d(TAG, "onResume: ");
         myAdapter.isConnecting = false;
+        myViewModel.setConnectCallback();
         myViewModel.startAccept();
     }
 
