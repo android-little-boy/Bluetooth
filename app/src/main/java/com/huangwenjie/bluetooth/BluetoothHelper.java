@@ -14,6 +14,7 @@ import android.util.Log;
 
 import com.huangwenjie.bluetooth.callback.ConnectCallback;
 import com.huangwenjie.bluetooth.callback.DiscoveryCallback;
+import com.huangwenjie.bluetooth.callback.ReceiverCallback;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -31,6 +32,7 @@ public class BluetoothHelper {
     private BluetoothAdapter mBluetoothAdapter;
     private DiscoveryCallback discoveryCallback;
     private ConnectCallback connectCallback;
+    private ReceiverCallback receiverCallback;
     private static final int FLAG_MSG = 0;  //消息标记
     private static final int FLAG_FILE = 1; //文件标记
     public static final String FLAG_CLOSE = "1111close";//通道关闭消息标记
@@ -69,6 +71,10 @@ public class BluetoothHelper {
 
     public void setConnectCallback(ConnectCallback callback) {
         this.connectCallback = callback;
+    }
+
+    public void setReceiverCallback(ReceiverCallback receiverCallback) {
+        this.receiverCallback = receiverCallback;
     }
 
     /**
@@ -136,7 +142,7 @@ public class BluetoothHelper {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 // 将名字和地址放入要显示的适配器中
                 if (discoveryCallback != null) {
-                        discoveryCallback.onNewDeviceHasFounded(device);
+                    discoveryCallback.onNewDeviceHasFounded(device);
                 }
             }
         }
@@ -317,8 +323,11 @@ public class BluetoothHelper {
                                     }
                                     isRead = false;
                                     Log.d(TAG, "run: reed");
+                                } else {
+                                    if (receiverCallback != null) {
+                                        receiverCallback.onReceive(msg);
+                                    }
                                 }
-                                //TODO 回调出去
                                 break;
                             case FLAG_FILE: //读取文件
                                 File file = new File(filePath);

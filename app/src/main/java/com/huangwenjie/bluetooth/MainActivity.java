@@ -2,6 +2,7 @@ package com.huangwenjie.bluetooth;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -18,6 +19,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
+import com.huangwenjie.bluetooth.adapter.MyAdapter;
 import com.huangwenjie.bluetooth.vm.MyViewModel;
 
 import java.util.ArrayList;
@@ -33,6 +35,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
         myViewModel = new ViewModelProvider(this).get(MyViewModel.class);
         myViewModel.init();
         BluetoothHelper.setDeviceVisible(this,120);
@@ -49,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "onChanged: ");
                 if (bluetoothDevice!=null){
                     Intent intent = new Intent(MainActivity.this,ChatActivity.class);
+                    intent.putExtra("name",bluetoothDevice.getName());
                     startActivity(intent);
                 }else {
                     myAdapter.isConnecting = false;
@@ -105,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private BroadcastReceiver mReceiver = new BroadcastReceiver() {
+    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
 
         @Override
         public void onReceive(Context context, Intent intent) {

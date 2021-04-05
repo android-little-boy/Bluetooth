@@ -1,4 +1,4 @@
-package com.huangwenjie.bluetooth;
+package com.huangwenjie.bluetooth.adapter;
 
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 
+import com.huangwenjie.bluetooth.R;
 import com.huangwenjie.bluetooth.vm.MyViewModel;
 
 import java.util.List;
@@ -19,7 +20,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     List<BluetoothDevice> bluetoothDevices;
     MyViewModel myViewModel;
     Context context;
-    boolean isConnecting = false;
+    public boolean isConnecting = false;
     private static final String TAG = "MyAdapter";
 
     public MyAdapter(List<BluetoothDevice> bluetoothDevices, MyViewModel myViewModel, Context context) {
